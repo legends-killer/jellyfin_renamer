@@ -1,0 +1,11 @@
+{
+  "name": "jellyfin_renamer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "legends-killer",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "node-fetch": "2"
+  }
+}

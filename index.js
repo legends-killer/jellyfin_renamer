@@ -2,7 +2,7 @@
  * @Author: legends-killer
  * @Date: 2023-07-29 13:34:48
  * @LastEditors: legends-killer
- * @LastEditTime: 2023-07-30 13:59:16
+ * @LastEditTime: 2023-07-30 14:12:19
  * @Description: 
  */
 const fetch = require('node-fetch');
@@ -30,9 +30,9 @@ const fetchUrl = async (url, method, body, getRaw) => {
 
 const rename = async (metadata, aiRename) => {
   const fullName = metadata.Path.split('/').pop()
-  if(!aiRename) return {...metadata, Name: fullName}
-  const aiName = await fetchUrl(CONFIG.GLM_URL, 'POST', JSON.stringify({prompt: CONFIG.PROMPT + fullName + ' \n文件重命名助手：', history: []}));
-  return {...metadata, Name: aiName.response.replace("文件重命名助手：", "")}
+  if (!aiRename) return { ...metadata, Name: fullName }
+  const aiName = await fetchUrl(CONFIG.GLM_URL, 'POST', JSON.stringify({ prompt: CONFIG.PROMPT + fullName + ' \n文件重命名助手：', history: [] }));
+  return { ...metadata, Name: aiName.response.replace("文件重命名助手：", "") }
 }
 
 const getItemMetadata = async (id) => {
@@ -52,8 +52,9 @@ const walkThrough = async (id, aiRename) => {
       const metadata = await getItemMetadata(ele.Id);
       const newMetadata = await rename(metadata, aiRename);
       const res = await fetchUrl(`${CONFIG.BASE_URL}/Items/${ele.Id}`, 'POST', JSON.stringify(newMetadata), true);
-      if (res.status === 204) Object.assign(lastRename, { [ele.Id]: {fullName: metadata.Name, aiName: newMetadata.Name} })
-      console.log(ele.Id,metadata.Name,'---------->', newMetadata.Name, res.status === 204 ? 'SUCCESS' : 'FAILED')
+      if (res.status === 204)
+        Object.assign(lastRename, { [ele.Id]: { fullName: metadata.Name, fileName: newMetadata.Name, namedByAi: aiRename } })
+      console.log(ele.Id, metadata.Name, '---------->', newMetadata.Name, res.status === 204 ? 'SUCCESS' : 'FAILED')
     }
   }
 }

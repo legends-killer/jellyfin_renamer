@@ -1,5 +1,9 @@
 {
   "API_KEY": "",
   "BASE_URL": "",
-  "USER_ID": ""
+  "USER_ID": "",
+  "GLM_URL": "",
+  "PROMPT": "",
+  "AI_RENAME_MEDIA_ID": "",
+  "DEBUG": false
 }

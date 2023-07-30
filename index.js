@@ -2,7 +2,7 @@
  * @Author: legends-killer
  * @Date: 2023-07-29 13:34:48
  * @LastEditors: legends-killer
- * @LastEditTime: 2023-07-29 22:30:52
+ * @LastEditTime: 2023-07-30 13:59:16
  * @Description: 
  */
 const fetch = require('node-fetch');
@@ -12,63 +12,57 @@ const fs = require('fs');
 const path = require('path');
 const lastRename = require('./lastRename.json');
 
-const fetchUrl = async (url, method, body) => {
+const fetchUrl = async (url, method, body, getRaw) => {
   const headers = {
     'Authorization': AUTH_HEADER
   }
   if (method === "POST") {
     headers['Content-Type'] = 'application/json'
   }
-  let res
-  try {
-    res = await fetch(url, {
-      method,
-      body,
-      headers
-    })
-  } catch (error) {
-    console.log(error)
-  }
-  if (method === "POST") return res
+  const res = await fetch(url, {
+    method,
+    body,
+    headers
+  })
+  if (getRaw) return res
   return res.json();
 }
 
-const rename = (metadata) => {
-  metadata.Name = metadata.Path.split('/').pop()
-  return metadata
+const rename = async (metadata, aiRename) => {
+  const fullName = metadata.Path.split('/').pop()
+  if(!aiRename) return {...metadata, Name: fullName}
+  const aiName = await fetchUrl(CONFIG.GLM_URL, 'POST', JSON.stringify({prompt: CONFIG.PROMPT + fullName + ' \n文件重命名助手：', history: []}));
+  return {...metadata, Name: aiName.response.replace("文件重命名助手：", "")}
 }
 
 const getItemMetadata = async (id) => {
   return await fetchUrl(`${CONFIG.BASE_URL}/Users/${CONFIG.USER_ID}/Items/${id}`, 'GET');
 }
 
-const walkThrough = async (id) => {
+const walkThrough = async (id, aiRename) => {
   const currentFolder = await fetchUrl(`${CONFIG.BASE_URL}/Users/${CONFIG.USER_ID}/Items?ParentId=${id}`, 'GET');
-  for await (const ele of currentFolder.Items) {
+  for (const ele of currentFolder.Items) {
     if (ele.Type === 'Folder') {
-      await walkThrough(ele.Id);
+      await walkThrough(ele.Id, aiRename);
     } else {
       if (lastRename[ele.Id]) {
         console.log(ele.Name, 'SKIP')
         continue
       }
       const metadata = await getItemMetadata(ele.Id);
-      const newMetadata = rename(metadata);
-      const res = await fetchUrl(`${CONFIG.BASE_URL}/Items/${ele.Id}`, 'POST', JSON.stringify(newMetadata));
-      if (res.status === 204) Object.assign(lastRename, { [ele.Id]: metadata.Name })
-      console.log(ele.Id, newMetadata.Name, res.status === 204 ? 'SUCCESS' : 'FAILED')
-      console.log('-------------------------------')
+      const newMetadata = await rename(metadata, aiRename);
+      const res = await fetchUrl(`${CONFIG.BASE_URL}/Items/${ele.Id}`, 'POST', JSON.stringify(newMetadata), true);
+      if (res.status === 204) Object.assign(lastRename, { [ele.Id]: {fullName: metadata.Name, aiName: newMetadata.Name} })
+      console.log(ele.Id,metadata.Name,'---------->', newMetadata.Name, res.status === 204 ? 'SUCCESS' : 'FAILED')
     }
   }
 }
 
 const work = async () => {
   const mediaFolders = await fetchUrl(`${CONFIG.BASE_URL}/Users/${CONFIG.USER_ID}/Items`, 'GET');
-  const promises = []
   for (const ele of mediaFolders.Items) {
-    promises.push(walkThrough(ele.Id));
+    await walkThrough(ele.Id, CONFIG.AI_RENAME_MEDIA_ID.includes(ele.Id.toString()));
   }
-  return Promise.all(promises)
 }
 
 const main = async () => {
